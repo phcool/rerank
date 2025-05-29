@@ -3,10 +3,6 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2505.20046-red.svg)](https://arxiv.org/abs/2505.20046)
 [![License](https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
 
-
-
-## Overview
-
 Rearank is an innovative **listwise reasoning reranking agent** powered by a specialized large language model (LLM). It significantly enhances information retrieval by employing **explicit reasoning** to reorder search results. Built upon **Qwen2.5-7B**, Rearank achieves performance comparable to GPT-4 while remarkably requiring **minimal annotated samples** for training.
 
 
@@ -99,7 +95,7 @@ To reproduce our benchmark results or run evaluations on your own, use the `run_
 python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standard --enable_thinking --log_name cotprompt
 
 # Note:
-# --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires pyseriny.
+# --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires Pyserini.
 # --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
 ```
 
@@ -125,6 +121,9 @@ If Rearank proves useful in your research, please consider citing our paper:
 }
 ```
 
+## Acknowledgement
+
+The repo and work is built upon great work [Pyserini](https://github.com/castorini/pyserini) and [RankGPT](https://github.com/sunnweiwei/RankGPT/tree/main?tab=readme-ov-file)
 
 ## Contact
 
