@@ -39,7 +39,12 @@ cd Rearank
 pip install -r requirements.txt
 ```
 
+For BEIR and TREC-DL datasets, Pyserini will automatically download the required files.
+For the Bright dataset, you'll need to manually download and extract the files (including qrels, queries, and passages) using:
 
+```
+wget https://huggingface.co/datasets/le723z/bright_tar/resolve/main/bright.tar.gz?download=true && tar -xvf bright.tar.gz -C data/ && rm bright.tar.gz
+```
 
 ## Usage
 
@@ -97,8 +102,6 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 # --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires pyseriny.
 # --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
 ```
-
----
 
 ## Training
 
