@@ -3,13 +3,13 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2505.20046-red.svg)](https://arxiv.org/abs/2505.20046)
 [![License](https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
 
----
+
 
 ## Overview
 
 Rearank is an innovative **listwise reasoning reranking agent** powered by a specialized large language model (LLM). It significantly enhances information retrieval by employing **explicit reasoning** to reorder search results. Built upon **Qwen2.5-7B**, Rearank achieves performance comparable to GPT-4 while remarkably requiring **minimal annotated samples** for training.
 
----
+
 
 ## Key Features
 
@@ -20,7 +20,12 @@ Rearank stands out with several technical advancements:
 * **Superior Performance:** Demonstrates significant improvements over existing baseline models in information retrieval tasks.
 * **Specialized for Information Retrieval:** Specifically designed and optimized for effective reranking in diverse information retrieval scenarios.
 
----
+<div align=center>
+<img width="80%" src="asset/example.png"/>
+</div>
+
+
+
 
 ## Installation
 
@@ -35,7 +40,7 @@ cd Rearank
 pip install -r requirements.txt
 ```
 
----
+
 
 ## Usage
 
@@ -80,7 +85,6 @@ for data in ['dl19']: # You can iterate through multiple datasets like 'dl19', '
     print(f"Rearank metrics for {data}: {rerank_metrics}")
 ```
 
----
 
 ## Benchmarks
 
@@ -94,7 +98,11 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 # --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires pyseriny.
 # --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
 ```
-![Results on benchmarks](assets/result.png)
+<div align=center>
+<img width="80%" src="asset/result.png"/>
+</div>
+
+
 
 ---
 
@@ -102,7 +110,7 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 
 Comming soon
 ![Results on benchmarks](assets/method.png)
----
+
 
 ## Citation
 
@@ -120,7 +128,6 @@ If Rearank proves useful in your research, please consider citing our paper:
 }
 ```
 
----
 
 ## Contact
 
