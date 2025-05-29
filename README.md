@@ -21,7 +21,7 @@ Rearank stands out with several technical advancements:
 * **Specialized for Information Retrieval:** Specifically designed and optimized for effective reranking in diverse information retrieval scenarios.
 
 <div align=center>
-<img width="80%" src="asset/example.png"/>
+<img width="80%" src="assets/example.png"/>
 </div>
 
 
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-The model is available at [huggingface](https://huggingface.co/le723z/Rearank-7B)
+The model is available at [Rearank-7B](https://huggingface.co/le723z/Rearank-7B) [![Hugging Face](https://img.shields.io/badge/🤗-Hugging%20Face-yellow.svg)](https://huggingface.co/le723z/Rearank-7B)
 
 Here's how you can use Rearank for your reranking tasks:
 
@@ -99,7 +99,7 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 # --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
 ```
 <div align=center>
-<img width="80%" src="asset/result.png"/>
+<img width="80%" src="assets/result.png"/>
 </div>
 
 
