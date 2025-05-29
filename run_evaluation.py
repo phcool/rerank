@@ -132,9 +132,9 @@ def run_evaluation(args, datasets):
         print('#' * 20)
         print(f'Evaluation on {data}')
         print('#' * 20)
-        
+
         if data in BRIGHT:
-            base_dir = '/network/scratch/l/le.zhang/DeepRerank'
+            base_dir = os.getcwd()
             bm25_results = get_hits_from_run_bright(base_dir, data)
         else:
             bm25_results = bm25_retrieve(data, top_k_retrieve=100)

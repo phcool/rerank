@@ -13,7 +13,7 @@ import re
 import random
 import os
 from utils import get_hits_from_run_bright
-
+os.environ['VLLM_WORKER_MULTIPROC_METHOD'] = 'spawn'
 
 def run_retriever(topics, searcher, qrels=None, k=100, qid=None):
     ranks = []
@@ -90,7 +90,7 @@ def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
     return messages
 
 
-def create_permutation_instruction_deeprerank(item=None, rank_start=0, rank_end=100):
+def create_permutation_instruction_rearank(item=None, rank_start=0, rank_end=100):
     query = item['query']
     num = len(item['hits'][rank_start: rank_end])
     instruction =  (
@@ -216,9 +216,11 @@ def sliding_windows_batch(agent, items, rank_start=0, rank_end=100, window_size=
             if window_idx < len(positions):
                 start_pos, end_pos = positions[window_idx]
                 if 'le723z' in agent.model_name and enable_thinking:
-                    messages = create_permutation_instruction_deeprerank(item=item, rank_start=start_pos, rank_end=end_pos)
+                    # rearank prompt
+                    messages = create_permutation_instruction_rearank(item=item, rank_start=start_pos, rank_end=end_pos)
                 else:
-                    messages = create_permutation_instruction_deeprerank(item=item, rank_start=start_pos, rank_end=end_pos)
+                    # rankgpt prompt
+                    messages = create_permutation_instruction(item=item, rank_start=start_pos, rank_end=end_pos)
                 batch_messages.append(messages)
                 batch_metadata.append((item_idx, start_pos, end_pos))
         
@@ -293,90 +295,24 @@ def bm25_retrieve(data, top_k_retrieve=100):
     return rank_results
 
 
-def main():
 
-    os.environ['VLLM_WORKER_MULTIPROC_METHOD'] = 'spawn'
-    # model_name = "le723z/qwen2_7b_deeprerank_ndcgreward10_3reward_v3"
-    model_name = "le723z/v9-s120"
-    # model_name = "Qwen/Qwen3-8B"
+   
+if __name__ == '__main__':
+    
+    model_name = "le723z/Rearank-7B"
     enable_thinking = True
-    verbose = False
-    # model_name = "Qwen/Qwen2.5-7B-Instruct"
-    
-    
-    
     agent = get_agent(model_name=model_name, api_key=None)
-    print(f"model_name: {agent.model_name}")
-    
+
     for data in ['dl19']:
         if data in BRIGHT:
-            base_dir = '/network/scratch/l/le.zhang/DeepRerank'
+            base_dir = os.getcwd()
             bm25_results = get_hits_from_run_bright(base_dir, data)
         else:
             bm25_results = bm25_retrieve(data, top_k_retrieve=100)
-        num_gpu = len(os.environ.get('CUDA_VISIBLE_DEVICES', '').split(',')) if os.environ.get('CUDA_VISIBLE_DEVICES') else 1
-        bs = 16
-
+    
         original_metrics, _ = eval_rerank(data, bm25_results)
-        rerank_results = process_rank_results_in_batches(agent, bm25_results, batch_size=bs, verbose=verbose, window_size=20, step=10, enable_thinking=enable_thinking)
+        rerank_results = process_rank_results_in_batches(agent, bm25_results, batch_size=16, window_size=20, step=10, enable_thinking=enable_thinking)
         rerank_metrics, _ = eval_rerank(data, rerank_results)
         print(f"data: {data}")
         print(f"original metrics: {original_metrics}")
         print(f"rerank metrics:   {rerank_metrics}")
-
-        for repeat in range(2):
-            half_rerank_results = []
-            for i in range(len(rerank_results)):
-                x = rerank_results[i]
-                x['hits'] = x['hits'][:len(x['hits'])//2]
-                half_rerank_results.append(x)
-            rerank_results = process_rank_results_in_batches(agent, half_rerank_results, batch_size=bs, verbose=verbose, window_size=20, step=10, enable_thinking=enable_thinking)
-            rerank_metrics, _ = eval_rerank(data, rerank_results)
-            print(f"{repeat+1} pass rerank metrics:   {rerank_metrics}")
-
-        # win_results = {}
-        # for qid, sample in enumerate(bm25_results):
-        #     hits = copy.deepcopy(sample['hits'])
-        #     rerank_win_original = 0
-          
-        #     temp_sample = copy.deepcopy(sample)
-        #     # random_select_index = random.sample(range(len(hits)), min(20, len(hits)))
-        #     # random_select_index.sort()
-        #     temp_sample['hits'] = hits[:20]
-
-
-        #     original_metrics, _ = eval_rerank(data, temp_sample)
-
-        #     rerank_results = process_rank_results_in_batches(agent, [temp_sample], batch_size=1, verbose=False)
-        #     rerank_metrics, _ = eval_rerank(data, rerank_results)
-            
-    
-        #     print(f"original metrics: {original_metrics}")
-        #     print(f"rerank metrics:   {rerank_metrics}")
-
-        #     if rerank_metrics['NDCG@10'] > original_metrics['NDCG@10']:
-        #         rerank_win_original += 1
-        #         print(f"rerank win")
-        #     else:
-        #         print(f"rerank lose")
-
-        #     print(f"***** qid: {qid}, rerank win rate: {rerank_win_original/5} *****")
-        #     win_results[qid] = rerank_win_original
-        # print(f"win results: {win_results}")
-        # print(f"mean win rate: {sum(win_results.values())/(len(win_results)*5)}")
-
-
-       
-        
-        # save rank_results
-        all_results[data] = {
-            'metrics': all_metrics
-        }
-        with open(results_file, 'w') as f:
-            json.dump(all_results, f, indent=4)
-        
-        # breakpoint()
-
-
-if __name__ == '__main__':
-    main()

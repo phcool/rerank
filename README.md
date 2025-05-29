@@ -1,28 +1,30 @@
-# Rearank: A Listwise Reasoning Reranking Agent
+# Rearank: Reasoning Re-ranking Agent via Reinforcement Learning 
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![arXiv](https://img.shields.io/badge/arXiv-2505.20046-red.svg)](https://arxiv.org/abs/2505.20046)
+[![License](https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
+
+---
 
 ## Overview
 
-Rearank is a sophisticated large language model (LLM)-based listwise reasoning reranking agent that revolutionizes information retrieval through explicit reasoning. Built on top of Qwen2.5-7B, Rearank demonstrates performance comparable to GPT-4 while requiring minimal annotated samples.
+Rearank is an innovative **listwise reasoning reranking agent** powered by a specialized large language model (LLM). It significantly enhances information retrieval by employing **explicit reasoning** to reorder search results. Built upon **Qwen2.5-7B**, Rearank achieves performance comparable to GPT-4 while remarkably requiring **minimal annotated samples** for training.
+
+---
 
 ## Key Features
 
-- **Explicit Reasoning**: Incorporates a listwise reasoning approach before reranking, enhancing both performance and interpretability
-- **Efficient Training**: Achieves state-of-the-art results with only 179 annotated samples
-- **Advanced Architecture**: Built on Qwen2.5-7B foundation model
-- **Strong Performance**: Comparable to GPT-4 on various benchmarks
-- **Versatility**: Excels in both in-domain and out-of-domain scenarios
-- **Superior Reasoning**: Outperforms GPT-4 on reasoning-intensive BRIGHT benchmarks
+Rearank stands out with several technical advancements:
 
-## Technical Highlights
+* **Reinforcement Learning:** Leverages reinforcement learning to dramatically improve its reasoning capabilities for reranking.
+* **Innovative Data Augmentation:** Employs novel data augmentation techniques to boost performance and reduce reliance on extensive annotated datasets.
+* **Superior Performance:** Demonstrates significant improvements over existing baseline models in information retrieval tasks.
+* **Specialized for Information Retrieval:** Specifically designed and optimized for effective reranking in diverse information retrieval scenarios.
 
-- Leverages reinforcement learning for enhanced reasoning capabilities
-- Implements innovative data augmentation techniques
-- Demonstrates significant improvements over baseline models
-- Specialized in information retrieval tasks
+---
 
 ## Installation
+
+Getting started with Rearank is straightforward:
 
 ```bash
 # Clone the repository
@@ -33,33 +35,93 @@ cd Rearank
 pip install -r requirements.txt
 ```
 
+---
+
 ## Usage
 
-[Usage instructions will be added]
+The model is available at [huggingface](https://huggingface.co/le723z/Rearank-7B)
+
+Here's how you can use Rearank for your reranking tasks:
+
+```python
+from rank_gpt import process_rank_results_in_batches, bm25_retrieve
+from utils import get_hits_from_run_bright
+from agent import get_agent
+from trec_eval import eval_rerank
+import os
+
+# Initialize the Rearank agent
+agent = get_agent(model_name="le723z/Rearank-7B", api_key=None)
+enable_thinking = True # Set to True to enable explicit reasoning traces
+
+# Example usage with different datasets
+for data in ['dl19']: # You can iterate through multiple datasets like 'dl19', 'bright', etc.
+    if data in BRIGHT: # Assuming BRIGHT is a predefined collection of datasets requiring specific handling
+        bm25_results = get_hits_from_run_bright(os.getcwd(), data)
+    else:
+        bm25_results = bm25_retrieve(data, top_k_retrieve=100)
+
+    # Evaluate original BM25 results
+    original_metrics, _ = eval_rerank(data, bm25_results)
+    print(f"Original BM25 metrics for {data}: {original_metrics}")
+
+    # Rerank results using Rearank
+    rerank_results = process_rank_results_in_batches(
+        agent,
+        bm25_results,
+        batch_size=16,    # Number of queries to process in parallel
+        window_size=20,   # Size of the reranking window
+        step=10,          # Step size for the sliding window
+        enable_thinking=enable_thinking
+    )
+
+    # Evaluate reranked results
+    rerank_metrics, _ = eval_rerank(data, rerank_results)
+    print(f"Rearank metrics for {data}: {rerank_metrics}")
+```
+
+---
 
 ## Benchmarks
 
-Rearank has been evaluated on multiple benchmarks:
-- Information Retrieval benchmarks (various)
-- BRIGHT benchmarks
-- In-domain and out-of-domain evaluations
+To reproduce our benchmark results or run evaluations on your own, use the `run_evaluation.py` script:
+
+```bash
+# Evaluate on TREC-DL 19, 20, and BEIR datasets
+python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standard --enable_thinking --log_name cotprompt
+
+# Note:
+# --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires pyseriny.
+# --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
+```
+![Results on benchmarks](assets/result.png)
+
+---
+
+## Training
+
+Comming soon
+![Results on benchmarks](assets/method.png)
+---
 
 ## Citation
 
-If you use Rearank in your research, please cite our paper:
+If Rearank proves useful in your research, please consider citing our paper:
 
 ```bibtex
-[Citation will be added upon paper publication]
+@misc{zhang2025rearankreasoningrerankingagent,
+      title={REARANK: Reasoning Re-ranking Agent via Reinforcement Learning},
+      author={Le Zhang and Bo Wang and Xipeng Qiu and Siva Reddy and Aishwarya Agrawal},
+      year={2025},
+      eprint={2505.20046},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={[https://arxiv.org/abs/2505.20046](https://arxiv.org/abs/2505.20046)},
+}
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-We welcome contributions! Please feel free to submit a Pull Request.
+---
 
 ## Contact
 
-For questions and feedback, please open an issue in the repository.
+For any questions or feedback, feel free to reach out directly to **le.zhang@mila.quebec**.
