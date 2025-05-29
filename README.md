@@ -16,12 +16,11 @@ Rearank is an innovative **listwise reasoning reranking agent** powered by a spe
 Rearank stands out with several technical advancements:
 
 * **Reinforcement Learning:** Leverages reinforcement learning to dramatically improve its reasoning capabilities for reranking.
-* **Innovative Data Augmentation:** Employs novel data augmentation techniques to boost performance and reduce reliance on extensive annotated datasets.
 * **Superior Performance:** Demonstrates significant improvements over existing baseline models in information retrieval tasks.
-* **Specialized for Information Retrieval:** Specifically designed and optimized for effective reranking in diverse information retrieval scenarios.
+* **Explicit Reasoning:** Specifically designed with explicit reasoning for each passages when reranking.
 
 <div align=center>
-<img width="80%" src="assets/example.png"/>
+<img width="50%" src="assets/overview.png"/>
 </div>
 
 
@@ -44,7 +43,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-The model is available at [Rearank-7B](https://huggingface.co/le723z/Rearank-7B) [![Hugging Face](https://img.shields.io/badge/🤗-Hugging%20Face-yellow.svg)](https://huggingface.co/le723z/Rearank-7B)
+The model is available at [Rearank-7B](https://huggingface.co/le723z/Rearank-7B)
 
 Here's how you can use Rearank for your reranking tasks:
 
@@ -98,11 +97,6 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 # --standard evaluates on TREC-DL 19, 20, and BEIR datasets, which requires pyseriny.
 # --bright evaluates on the BRIGHT dataset, which needs to be downloaded manually.
 ```
-<div align=center>
-<img width="80%" src="assets/result.png"/>
-</div>
-
-
 
 ---
 
