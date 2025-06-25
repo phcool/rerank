@@ -101,10 +101,18 @@ python run_evaluation.py --model_name le723z/Rearank-7B --skip_existing --standa
 
 ## Training
 
-Comming soon
 ![Results on benchmarks](assets/method.png)
 
+To train Rearank, follow these steps:
 
+```bash
+cd verl/
+bash examples/grpo_trainer/deeprerank.sh
+```
+
+Before starting, ensure all dependencies are installed as described in the [VERL repository](https://github.com/volcengine/verl).
+
+The core of Rearank's training is its custom reward function, implemented in [`listwiserank.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/utils/reward_score/listwiserank.py). This function is invoked during each rollout by the naive reward manager, located at [`naive.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/workers/reward_manager/naive.py).
 ## Citation
 
 If Rearank proves useful in your research, please consider citing our paper:
