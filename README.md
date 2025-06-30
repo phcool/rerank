@@ -112,7 +112,7 @@ bash examples/grpo_trainer/deeprerank.sh
 
 Before starting, ensure all dependencies are installed as described in the [VERL repository](https://github.com/volcengine/verl).
 
-The core of Rearank's training is its custom reward function, implemented in [`listwiserank.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/utils/reward_score/listwiserank.py). This function is invoked during each rollout by the naive reward manager, located at [`naive.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/workers/reward_manager/naive.py).
+The core of Rearank's training is its custom reward function, implemented in [`listwiserank.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/utils/reward_score/listwiserank.py). This function is invoked during each rollout by the naive reward manager, located at [`batch.py`](https://github.com/lezhang7/Rearank/blob/main/verl/verl/workers/reward_manager/batch.py).
 ## Citation
 
 If Rearank proves useful in your research, please consider citing our paper:

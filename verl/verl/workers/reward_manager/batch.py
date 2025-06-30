@@ -16,7 +16,7 @@ from collections import defaultdict
 
 import torch
 from verl import DataProto
-from verl.utils.reward_score import deeprerank
+from verl.utils.reward_score import listwiserank
 
 def load_qrels(qrels_path):
     """Load qrels directly into the format needed for pytrec_eval"""
@@ -38,10 +38,10 @@ class BatchRewardManager:
     def __init__(self, tokenizer, num_examine, compute_score, reward_fn_key="data_source", **reward_kwargs):
         self.tokenizer = tokenizer
         self.num_examine = num_examine
-        self.compute_score = deeprerank.compute_score
+        self.compute_score = compute_score or listwiserank.compute_score
         self.reward_fn_key = reward_fn_key
         self.reward_kwargs = reward_kwargs
-        self.qrels_dict = load_qrels("/mnt/home/DeepRerank/data/combined_qrels.txt")
+        self.qrels_dict = load_qrels("combined_qrels.txt")
 
     def verify(self, data):
         prompt_ids = data.batch["prompts"]
