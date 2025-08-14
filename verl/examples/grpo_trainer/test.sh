@@ -8,14 +8,14 @@ export QRELS_FILE_PATH=/data/coding/Rearank/data/combined_qrels.txt
 cd /data/coding/Rearank
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    data.train_files=/data/coding/Rearank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
-    data.val_files=/data/coding/Rearank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
+    data.train_files=/data/coding/rerank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
+    data.val_files=/data/coding/rerank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
     data.train_batch_size=2 \
     data.max_prompt_length=3072 \
     data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-3B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-7B-Instruct \
     +actor_rollout_ref.model.peft_config.peft_type=lora \
     +actor_rollout_ref.model.peft_config.lora_r=8 \
     +actor_rollout_ref.model.peft_config.lora_alpha=16 \
@@ -47,8 +47,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name='rearank_7b' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
-    trainer.save_freq=1 \
+    trainer.save_freq=20 \
     trainer.test_freq=-1 \
     trainer.total_epochs=1 \
-    custom_reward_function.path=/data/coding/Rearank/reward_func.py \
+    custom_reward_function.path=/data/coding/rerank/reward_func.py \
     custom_reward_function.name=compute_score
