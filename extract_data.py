@@ -87,7 +87,7 @@ def main():
     parser = argparse.ArgumentParser(description='从parquet文件中提取小部分数据用于测试')
     parser.add_argument('--input', '-i', type=str, help='输入的parquet文件路径')
     parser.add_argument('--output', '-o', type=str, help='输出的parquet文件路径')
-    parser.add_argument('--samples', '-n', type=int, default=10, help='要提取的样本数量 (默认: 10)')
+    parser.add_argument('--samples', '-n', type=int, default=2, help='要提取的样本数量 (默认: 2)')
     parser.add_argument('--seed', '-s', type=int, default=42, help='随机种子 (默认: 42)')
     parser.add_argument('--list', '-l', action='store_true', help='列出data目录中的所有parquet文件')
     
