@@ -21,44 +21,13 @@ def save_dataset(dataset: Dataset, output_dir: str, filename: str, save_format: 
         raise ValueError(f"Unsupported save_format: {save_format}. Use 'parquet' or 'jsonl'.")
 
     return output_path
-
-
 def build_elimination_sort_instruction(query_text: Optional[str]) -> str:
-    q = f'"{query_text}"' if query_text else "the search query"
-    return (
-        f"Please rank these passages according to their relevance to the search query: {q}\n\n"
-        "CRITICAL: You MUST follow these steps EXACTLY. Do NOT deviate from this format.\n\n"
-        "Step 1: Within <think> tags, perform ELIMINATION SORTING:\n"
-        "   a) Start with all passages: [1], [2], [3], ..., [n]\n"
-        "   b) For each round, identify the LEAST relevant passage among remaining ones:\n"
-        "      - Compare ALL remaining passages to the query\n"
-        "      - Identify which passage is LEAST relevant and explain why\n"
-        "      - State: 'Round X: [passage_id] is least relevant because [reason]'\n"
-        "      - Remove it from consideration\n"
-        "   c) Show remaining passages after each elimination: 'Remaining: [a], [b], [c], ...'\n"
-        "   d) Continue until only one passage remains\n"
-        "   e) The final ranking is the REVERSE order of elimination (last eliminated = most relevant)\n\n"
-        "Step 2: Within <answer> tags, provide ONLY the final ranking:\n"
-        "   - Format: [X] > [Y] > [Z] > [W] > ...\n"
-        "   - Most relevant first, least relevant last\n"
-        "   - Include ALL passage identifiers EXACTLY ONCE\n"
-        "   - NO additional text, explanations, or comments\n"
-        "   - NO text outside the <answer> tags\n\n"
-        "EXAMPLE FORMAT:\n"
-        "<think>\n"
-        "Starting passages: [1], [2], [3], [4]\n"
-        "Round 1: [4] is least relevant because it doesn't address the query topic\n"
-        "Remaining: [1], [2], [3]\n"
-        "Round 2: [2] is least relevant because it's less specific than others\n"
-        "Remaining: [1], [3]\n"
-        "Round 3: [3] is least relevant because [1] provides more comprehensive information\n"
-        "Remaining: [1]\n"
-        "Elimination complete. Final ranking (reverse of elimination): [1] > [3] > [2] > [4]\n"
-        "</think>\n\n"
-        "<answer>\n"
-        "[1] > [3] > [2] > [4]\n"
-        "</answer>"
-    )
+    # Deprecated local definition kept for backward compatibility; delegate to shared module
+    from rank_prompts import build_elimination_sort_instruction as _builder
+    return _builder(query_text)
+
+
+
 
 
 def transform_prompt(example: Dict[str, Any]) -> Dict[str, Any]:
@@ -66,8 +35,16 @@ def transform_prompt(example: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(prompts, list):
         return {"prompt": prompts}
 
-    # 构造新的尾部指令
-    new_tail = build_elimination_sort_instruction(example.get("query"))
+    # 构造新的尾部指令（与测试脚本的一致强化约束）
+    instr = build_elimination_sort_instruction(example.get("query"))
+    tail_extra = (
+        "\n\n"
+        "Use ONLY the <think> and <answer> tags; do NOT use any other tags (e.g., <tool_call>).\n"
+        "In <answer>, you MUST include ALL of the presented passage identifiers exactly once (no omissions, no duplicates).\n"
+        "If you are uncertain about some comparisons, still produce a full order using your best judgment.\n"
+        "Now please produce the final ranking."
+    )
+    new_tail = instr + tail_extra
 
     # 找到最后一个用户侧的排序指令消息并替换，否则追加一个新的
     target_idx = None
@@ -158,12 +135,12 @@ def main() -> None:
     original_path = save_dataset(ds, output_dir, output_name, save_format)
     print(f"已保存原始数据到: {original_path}")
 
-    # 2) 重写 prompt 列为淘汰排序算法的格式，并另存
-    print("正在重写 prompt 列为淘汰排序算法的格式...")
+    # 2) 重写 prompt 为灵活排序格式，并另存
+    print("正在重写 prompt 为灵活排序格式...")
     ds_elimination_sort = ds.map(transform_prompt, desc="rewrite_prompt_elimination_sorting")
     output_name_elimination_sort = f"{output_name}__elimination_sort"
     elimination_sort_path = save_dataset(ds_elimination_sort, output_dir, output_name_elimination_sort, save_format)
-    print(f"已保存淘汰排序版到: {elimination_sort_path}")
+    print(f"已保存灵活排序版到: {elimination_sort_path}")
 
 
 if __name__ == "__main__":
