@@ -20,6 +20,12 @@
 
 ## Usage
 
+You can begin with 
+```bash
+python test_qwen.py
+```
+to test the base output 
+
 ### Step 1: Generate Training Data
 
 Use the `produce_data.py` script to generate training data for the ranking task:
