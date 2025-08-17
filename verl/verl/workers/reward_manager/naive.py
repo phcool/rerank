@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from collections import defaultdict
+import os
 
 import torch
 
@@ -44,7 +45,9 @@ class NaiveRewardManager:
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
         self.compute_score = compute_score or listwiserank.compute_score
         self.reward_fn_key = reward_fn_key
-        self.qrels_dict = load_qrels("combined_qrels.txt")
+        # Prefer explicit env var, then project default path
+        qrels_path = os.environ.get("QRELS_FILE_PATH", "data/combined_qrels.txt")
+        self.qrels_dict = load_qrels(qrels_path)
 
     def __call__(self, data: DataProto, return_dict=False):
         """We will expand this function gradually based on the available datasets"""

@@ -3,25 +3,20 @@ set -x
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False
 # export VLLM_ATTENTION_BACKEND=XFORMERS
 
-export QRELS_FILE_PATH=/data/coding/Rearank/data/combined_qrels.txt
 
 cd /data/coding/Rearank
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    data.train_files=/data/coding/rerank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
-    data.val_files=/data/coding/rerank/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
+    data.train_files=/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
+    data.val_files=/data/rearank_12k/rearank_12k__default__train__elimination_sort_small_2.parquet \
     data.train_batch_size=2 \
     data.max_prompt_length=3072 \
     data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-7B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507 \
     +actor_rollout_ref.model.peft_config.peft_type=lora \
-    +actor_rollout_ref.model.peft_config.lora_r=8 \
-    +actor_rollout_ref.model.peft_config.lora_alpha=16 \
-    +actor_rollout_ref.model.peft_config.lora_dropout=0.1 \
-    +actor_rollout_ref.model.peft_config.target_modules=['q_proj','k_proj','v_proj','o_proj','gate_proj','up_proj','down_proj'] \
-    actor_rollout_ref.actor.optim.lr=1e-4 \
+    actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=2 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2 \
@@ -30,8 +25,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=2 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
