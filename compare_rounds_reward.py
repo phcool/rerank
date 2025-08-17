@@ -13,20 +13,158 @@
 """
 from __future__ import annotations
 import re
+import os
+import copy
 from typing import List, Tuple, Dict, Any, Set
 
-# 复用NDCG计算（避免重复代码）
-try:
-    from elimination_sort_reward import compute_ndcg_reward
-except Exception:
-    compute_ndcg_reward = None
+# Expected number of passages required in <answer>
+ANSWER_EXPECTED_N = 20
+
+# 直接实现 NDCG 相关工具与计算（不再复用其他文件）
+
+def remove_duplicate(response, permutation):
+    """移除重复项"""
+    new_response = []
+    for c in response:
+        if c not in new_response:
+            new_response.append(c)
+        else:
+            print(f"duplicate {c} in response: {response}")
+            print(f"permutation: {permutation}")
+    return new_response
+
+
+def clean_response(response: str):
+    """清理响应字符串，保留数字，其余转空格"""
+    chars = []
+    for c in response:
+        if c.isdigit():
+            chars.append(c)
+        else:
+            chars.append(' ')
+    return ''.join(chars).strip()
+
+
+def receive_permutation(item, permutation, rank_start=0, rank_end=100):
+    """根据预测的排列(permutation)对 item['hits'] 进行重排"""
+    print(f"original answer: {permutation}")
+    response = clean_response(permutation)
+    response = [int(x) - 1 for x in response.split()]
+    response = remove_duplicate(response, permutation)
+    print(f"cleaned answer: {response}")
+    cut_range = copy.deepcopy(item['hits'][rank_start: rank_end])
+    original_rank = [tt for tt in range(len(cut_range))]
+    response = [ss for ss in response if ss in original_rank]
+    response = response + [tt for tt in original_rank if tt not in response]
+    print(f"final permutation index: {response}")
+    for j, x in enumerate(response):
+        item['hits'][j + rank_start] = copy.deepcopy(cut_range[x])
+        if 'rank' in item['hits'][j + rank_start]:
+            item['hits'][j + rank_start]['rank'] = cut_range[j]['rank']
+        if 'score' in item['hits'][j + rank_start]:
+            item['hits'][j + rank_start]['score'] = cut_range[j]['score']
+    return item
+
+
+def load_qrels_dict(qrels_path: str = None) -> dict:
+    """加载 qrels 文件，带多路径回退与环境变量支持"""
+    if qrels_path is None:
+        env_path = os.environ.get('QRELS_FILE_PATH')
+        if env_path and os.path.exists(env_path):
+            qrels_path = env_path
+        else:
+            possible_paths = [
+                '/data/coding/Rearank/data/combined_qrels.txt',
+                os.path.join(os.path.dirname(__file__), 'data', 'combined_qrels.txt'),
+                os.path.join(os.path.dirname(__file__), '..', 'data', 'combined_qrels.txt'),
+                os.path.join(os.getcwd(), 'data', 'combined_qrels.txt'),
+                os.path.join(os.getcwd(), 'combined_qrels.txt'),
+                'data/combined_qrels.txt',
+                'combined_qrels.txt'
+            ]
+            for path in possible_paths:
+                print(f"Trying qrels path: {path}")
+                if os.path.exists(path):
+                    qrels_path = path
+                    print(f"Found qrels file at: {qrels_path}")
+                    break
+            if qrels_path is None:
+                print("Warning: combined_qrels.txt not found in any of the following paths:")
+                for path in possible_paths:
+                    print(f"  - {path}")
+                print("Using empty qrels_dict")
+                return {}
+
+    qrels_dict = {}
+    try:
+        with open(qrels_path, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    qid, _, docid, rel = parts[0], parts[1], parts[2], int(parts[3])
+                    if qid not in qrels_dict:
+                        qrels_dict[qid] = {}
+                    qrels_dict[qid][docid] = rel
+        print(f"Loaded qrels from {qrels_path}")
+    except Exception as e:
+        print(f"Error loading qrels file {qrels_path}: {e}")
+        return {}
+
+    return qrels_dict
+
+
+def compute_ndcg_reward(predict_str: str, item: dict, qrels_dict: dict = None) -> float:
+    """计算 NDCG 奖励，等价于 reward_func.py 中的实现，但不复用导入"""
+    try:
+        # 尝试多种导入路径
+        try:
+            from verl.utils.reward_score.trec_eval import eval_rerank
+        except ImportError:
+            try:
+                from Rearank.verl.verl.utils.reward_score.trec_eval import eval_rerank
+            except ImportError:
+                import sys
+                sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'verl'))
+                try:
+                    from verl.utils.reward_score.trec_eval import eval_rerank
+                except Exception:
+                    from Rearank.verl.verl.utils.reward_score.trec_eval import eval_rerank
+
+        # 解析出答案里的排列，应用到 item 上
+        permutation = predict_str
+        item = receive_permutation(item, permutation, rank_start=0, rank_end=len(item['hits']))
+
+        # 确保 qrels_dict 不为 None
+        if qrels_dict is None:
+            qrels_dict = load_qrels_dict()
+
+        all_metric = eval_rerank('custom', item, qrels_dict=qrels_dict)
+        rerank_score = all_metric.get('NDCG@10', 0.0)
+        init_score = item['metrics'].get('NDCG@10', 0.0)
+        best_score = item['best_metrics'].get('NDCG@10', 0.0)
+        score = (rerank_score - init_score) / (best_score - init_score) if best_score != init_score else 0.0
+        return score
+
+    except Exception as e:
+        print(f"Error in compute_ndcg_reward: {e}")
+        return 0.0
 
 
 # ------------------------ 基础提取 ------------------------
 
 def extract_think_content(predict_str: str) -> str:
+    """Extract reasoning text.
+    Primary: content inside <think> ... </think>.
+    Fallback: if no <think>, use everything before the first <answer> tag; if no <answer> either, use full text.
+    This allows scoring when models omit <think> but still write comparison lines in plain text.
+    """
     m = re.search(r"<think>(.*?)</think>", predict_str, re.DOTALL)
-    return m.group(1).strip() if m else ""
+    if m:
+        return m.group(1).strip()
+    # fallback: text before <answer>
+    ma = re.search(r"<answer>", predict_str)
+    pre = predict_str[: ma.start()] if ma else predict_str
+    return pre.strip()
 
 
 def extract_answer_content(predict_str: str) -> str:
@@ -184,64 +322,54 @@ def compute_compare_rounds_reward(predict_str: str, item: dict, qrels_dict: dict
     think = extract_think_content(predict_str)
     answer = extract_answer_content(predict_str)
 
-    # 1) 解析比较
+    # 1) 解析比较（仅用于统计格式和重复）
     comparisons, invalid_lines = extract_all_comparisons(think)
 
-    # 2) 重复与矛盾
-    dup_pairs, contradiction_pairs, winners_by_pair = check_duplicates_and_contradictions(comparisons)
+    # 2) 统计重复（不再检查 answer 一致性与是否成环）
+    dup_pairs, _contradiction_pairs, _winners_by_pair = check_duplicates_and_contradictions(comparisons)
 
-    # 3) 环检测（由 winners_by_pair 导出的有向边）
-    edges = []
-    for (a, b), w in winners_by_pair.items():
-        loser = b if w == a else a
-        edges.append((w, loser))
-    cycle = has_cycle(edges) if edges else False
+    # 3) 严格答案格式：必须是 [1..ANSWER_EXPECTED_N] 的一个排列（无重复、无遗漏、无越界）
+    def parse_answer_ids(ans: str) -> List[int]:
+        ids = re.findall(r"\[(\d+)\]", ans)
+        return [int(x) for x in ids]
 
-    # 4) 答案一致性
-    ans_consistency, satisfied_cnt, total_constraints = check_answer_respects_comparisons(answer, winners_by_pair)
+    answer_ids = parse_answer_ids(answer)
+    expected_set = set(range(1, ANSWER_EXPECTED_N + 1))
+    answer_set = set(answer_ids)
+    correct_len = len(answer_ids) == ANSWER_EXPECTED_N
+    no_duplicates = len(answer_ids) == len(answer_set)
+    in_range = answer_set.issubset(expected_set)
+    answer_format = 1.0 if (correct_len and no_duplicates and in_range) else 0.0
 
-    # 5) 答案格式
-    answer_format = 1.0 if re.match(r"^\s*\[\d+\](\s*>\s*\[\d+\])*\s*$", answer.strip()) else 0.0 if answer else 0.0
-
-    # 6) NDCG
+    # 4) NDCG（当答案格式不合规时，直接置为 0）
     ndcg_reward = 0.0
-    if compute_ndcg_reward is not None:
+    if answer_format == 1.0 and compute_ndcg_reward is not None:
         ndcg_reward = compute_ndcg_reward(predict_str, item, qrels_dict)
 
-    # 7) 比较格式覆盖率（每个 Compare 行均匹配）
+    # 5) think 格式正确性：所有以 Compare 开头的行都能被解析
     compare_lines = [ln for ln in think.splitlines() if re.match(r"\s*(?:Round\s+\d+:\s*)?Compare\b", ln.strip(), re.IGNORECASE)]
     total_compare_lines = len(compare_lines)
     valid_compare_lines = len(comparisons)
-    format_cover = (valid_compare_lines / total_compare_lines) if total_compare_lines else (1.0 if not think else 0.0)
+    think_format = (valid_compare_lines / total_compare_lines) if total_compare_lines else (1.0 if not think else 0.0)
 
-    # 8) 组合评分（总和约1.0）
+    # 6) think 无重复比较
+    think_no_duplicates = 1.0 if dup_pairs == 0 else 0.0
+
+    # 7) 组合评分：ndcg 0.7 + think_format 0.1 + answer_format 0.1 + think_no_duplicates 0.1
     total_score = (
-        0.5 * ndcg_reward +
-        0.2 * ans_consistency +
-        0.1 * format_cover +
+        0.7 * ndcg_reward +
+        0.1 * think_format +
         0.1 * answer_format +
-        0.1 * (0.0 if cycle else 1.0)
+        0.1 * think_no_duplicates
     )
-
-    # 对重复与矛盾做扣分
-    penalty = 0.0
-    if dup_pairs > 0:
-        penalty += min(0.1, 0.05 * dup_pairs)
-    if contradiction_pairs > 0:
-        penalty += min(0.2, 0.1 * contradiction_pairs)
-    total_score = max(0.0, total_score - penalty)
 
     return {
         "score": total_score,
         "ndcg_reward": ndcg_reward,
-        "answer_consistency": ans_consistency,
+        "think_format": think_format,
         "answer_format": answer_format,
-        "format_cover": format_cover,
+        "think_no_duplicates": think_no_duplicates,
         "duplicate_pairs": dup_pairs,
-        "contradiction_pairs": contradiction_pairs,
-        "has_cycle": cycle,
-        "satisfied_constraints": satisfied_cnt,
-        "total_constraints": total_constraints,
         "invalid_compare_lines": invalid_lines,
         "num_valid_comparisons": valid_compare_lines,
         "num_compare_lines": total_compare_lines,
