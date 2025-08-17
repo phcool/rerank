@@ -50,5 +50,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=20 \
     trainer.test_freq=-1 \
     trainer.total_epochs=1 \
-    custom_reward_function.path=/data/coding/rerank/reward_func.py \
+    custom_reward_function.path=/data/coding/rerank/compare_rounds_reward.py \
     custom_reward_function.name=compute_score
