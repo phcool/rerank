@@ -205,9 +205,52 @@ def extract_think_content(predict_str: str) -> str:
     return pre.strip()
 
 
+def normalize_response_for_tags(s: str) -> str:
+    """Normalize response text to improve <answer> tag detection.
+    - Remove zero-width and directional marks
+    - Convert fullwidth brackets/angles to ASCII
+    - Normalize whitespace around tag names (e.g., < answer > -> <answer>)
+    """
+    if not isinstance(s, str):
+        return s
+    # Remove zero-widths and bidi controls
+    zero_widths = [
+        "\u200b", "\ufeff", "\u200e", "\u200f",
+        "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
+    ]
+    for zw in zero_widths:
+        s = s.replace(zw, "")
+    # Fullwidth to ASCII for brackets and angle brackets
+    trans = {
+        ord("＜"): "<", ord("＞"): ">",
+        ord("［"): "[", ord("］"): "]",
+        ord("【"): "[", ord("】"): "]",
+    }
+    s = s.translate(trans)
+    # Normalize whitespace around tags like < answer > -> <answer>
+    s = re.sub(r"<\s*(answer|think)\s*>", lambda m: f"<{m.group(1).lower()}>", s, flags=re.IGNORECASE)
+    s = re.sub(r"<\s*/\s*(answer|think)\s*>", lambda m: f"</{m.group(1).lower()}>", s, flags=re.IGNORECASE)
+    return s
+
+
 def extract_answer_content(predict_str: str) -> str:
-    m = re.search(r"<answer>(.*?)</answer>", predict_str, re.DOTALL)
-    return m.group(1).strip() if m else ""
+    """Extract ONLY the content inside <answer>...
+    - If both <answer> and </answer> exist, return the inner content
+    - If only opening <answer> exists, return the tail after it
+    - If no <answer> tag, return empty string
+    """
+    cleaned = normalize_response_for_tags(predict_str)
+    # Remove tool_call blocks and stray openings to avoid noise
+    cleaned = re.sub(r"<\s*tool_call\s*>.*?<\s*/\s*tool_call\s*>", " ", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"<\s*tool_call\s*>", " ", cleaned, flags=re.IGNORECASE)
+
+    m = re.search(r"<\s*answer\s*>(.*?)<\s*/\s*answer\s*>", cleaned, re.DOTALL | re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    m_open = re.search(r"<\s*answer\s*>", cleaned, re.IGNORECASE)
+    if m_open:
+        return cleaned[m_open.end():].strip()
+    return ""
 
 
 # ------------------------ 解析比较行 ------------------------
