@@ -11,4 +11,3 @@ accelerate
 hydra-core
 tensordict
 datasets
-flash_attn

@@ -14,7 +14,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
-    actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507 \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-7B-Instruct \
     +actor_rollout_ref.model.peft_config.peft_type=lora \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \

@@ -2,8 +2,9 @@
 ## Prerequisites
 
 - Python 3.10
-- CUDA 12.4
-- pytorch 2.4.1
+- CUDA 12.1
+- pytorch 2.5.1
+- flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 
 ## Installation
 
@@ -16,6 +17,7 @@
 2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
+   pip install flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
    ```
 
 ## Usage
@@ -45,7 +47,7 @@ This script will:
 Extract a small subset of data (2 samples) for testing purposes:
 
 ```bash
-python extract_data.py 
+python extract_data.py --samples x (exp: x=2)
 ```
 
 ### Step 3: Test with Small Dataset
