@@ -45,18 +45,56 @@ def clean_response(response: str):
     return ''.join(chars).strip()
 
 
-def receive_permutation(item, permutation, rank_start=0, rank_end=100):
-    """根据预测的排列(permutation)对 item['hits'] 进行重排"""
-    print(f"original answer: {permutation}")
-    response = clean_response(permutation)
-    response = [int(x) - 1 for x in response.split()]
-    response = remove_duplicate(response, permutation)
-    print(f"cleaned answer: {response}")
+def parse_answer_ids_strict(answer_text: str) -> list:
+    """严格从answer文本中提取[数字]格式的ID列表"""
+    ids = re.findall(r"\[(\d+)\]", answer_text)
+    return [int(x) - 1 for x in ids]  # 转换为0基索引
+
+
+def receive_permutation(item, answer_text, rank_start=0, rank_end=100):
+    """根据answer中的排列对 item['hits'] 进行重排"""
+    DEBUG_REWARD = os.getenv("DEBUG_REWARD", "0") == "1"
+
+    if DEBUG_REWARD:
+        print(f"original answer: {answer_text}")
+
+    # 严格从answer中提取[数字]格式的排序
+    response = parse_answer_ids_strict(answer_text)
+
+    if DEBUG_REWARD:
+        print(f"extracted indices: {response}")
+
+    # 如果没有提取到任何有效排序，使用原始顺序
     cut_range = copy.deepcopy(item['hits'][rank_start: rank_end])
-    original_rank = [tt for tt in range(len(cut_range))]
-    response = [ss for ss in response if ss in original_rank]
-    response = response + [tt for tt in original_rank if tt not in response]
-    print(f"final permutation index: {response}")
+    original_rank = list(range(len(cut_range)))
+
+    if not response:
+        # 没有answer或answer无效，保持原始排序
+        response = original_rank
+        if DEBUG_REWARD:
+            print("No valid answer found, using original order")
+    else:
+        # 去重复（保持第一次出现的顺序）
+        seen = set()
+        deduplicated = []
+        for idx in response:
+            if idx not in seen and 0 <= idx < len(cut_range):
+                seen.add(idx)
+                deduplicated.append(idx)
+
+        # 补全缺失的索引（添加到末尾）
+        for idx in original_rank:
+            if idx not in seen:
+                deduplicated.append(idx)
+
+        response = deduplicated
+
+    # 无论是否DEBUG，都打印clean后的顺序（索引与1基序号）
+    order_1based = [i + 1 for i in response]
+    order_1based_str = " > ".join([f"[{i}]" for i in order_1based])
+    print(f"[compare_rounds_reward] clean_order_idx={response}; clean_order={order_1based_str}")
+
+    # 重新排列hits
     for j, x in enumerate(response):
         item['hits'][j + rank_start] = copy.deepcopy(cut_range[x])
         if 'rank' in item['hits'][j + rank_start]:
@@ -341,10 +379,10 @@ def compute_compare_rounds_reward(predict_str: str, item: dict, qrels_dict: dict
     in_range = answer_set.issubset(expected_set)
     answer_format = 1.0 if (correct_len and no_duplicates and in_range) else 0.0
 
-    # 4) NDCG（当答案格式不合规时，直接置为 0）
+    # 4) NDCG：始终基于answer解析；若answer无效则采用原始排序（在receive_permutation内部处理）
     ndcg_reward = 0.0
-    if answer_format == 1.0 and compute_ndcg_reward is not None:
-        ndcg_reward = compute_ndcg_reward(predict_str, item, qrels_dict)
+    if compute_ndcg_reward is not None:
+        ndcg_reward = compute_ndcg_reward(answer, item, qrels_dict)
 
     # 5) think 格式正确性：所有以 Compare 开头的行都能被解析
     compare_lines = [ln for ln in think.splitlines() if re.match(r"\s*(?:Round\s+\d+:\s*)?Compare\b", ln.strip(), re.IGNORECASE)]
@@ -361,6 +399,13 @@ def compute_compare_rounds_reward(predict_str: str, item: dict, qrels_dict: dict
         0.1 * think_format +
         0.1 * answer_format +
         0.1 * think_no_duplicates
+    )
+    print(
+        f"[compare_rounds_reward] ndcg={ndcg_reward:.6f}, "
+        f"think_format={think_format:.6f}, "
+        f"answer_format={answer_format:.6f}, "
+        f"think_no_duplicates={think_no_duplicates:.6f}, "
+        f"total={total_score:.6f}"
     )
 
     return {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-使用与produce_data.py一致的“灵活排序”prompt，构造1个query和10个doc，
+使用与produce_data.py一致的“灵活排序”prompt，构造1个query和20个doc，
 用 Qwen2.5-7B-Instruct 进行回答，并输出<think>/<answer>部分。
 
 注：为避免对datasets等依赖的导入需求，本测试脚本内复刻了
@@ -11,7 +11,6 @@ import json
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from rank_prompts import build_elimination_sort_instruction
-import compare_rounds_reward as cr_reward
 
 
 def create_test_data():
@@ -27,6 +26,16 @@ def create_test_data():
         "[8] Proper hydration strategies are essential for marathon runners to avoid cramps and fatigue. This guidance is specific to endurance events rather than general health outcomes. It does not replace the broad preventive effects of routine physical activity on chronic disease. Overhydration and underhydration both carry risks (e.g., hyponatremia or heat illness) in long races. These niche considerations are not central to population-level exercise benefits.",
         "[9] Consistent exercise can improve sleep quality and daytime energy levels. Physical activity influences circadian regulation and sleep architecture, often increasing slow-wave sleep. Better sleep in turn supports metabolic health and cognitive performance. Clinical studies in insomnia show small-to-moderate improvements with aerobic or combined training. Morning or early-afternoon sessions may optimize phase-shifting for certain chronotypes.",
         "[10] Some people collect stamps as a hobby unrelated to physical activity. This pastime is not associated with improvements in metabolic, cardiovascular, or musculoskeletal health and therefore is irrelevant to exercise benefits. Although cognitively engaging, it does not induce the physiological adaptations seen with regular training. Any health value would be indirect (e.g., stress relief) and not comparable to exercise’s established effects.",
+        "[11] Moderate-intensity aerobic exercise demonstrates HbA1c reductions in adults with type 2 diabetes across multiple randomized trials. Combined diet-and-exercise interventions often produce larger effects on glycemic control, and benefits persist with long-term adherence. Mechanisms include increased glucose transport and improved mitochondrial efficiency in skeletal muscle.",
+        "[12] Regular physical activity supports cognitive health, with evidence for improved executive function and processing speed. Aerobic and resistance training may increase hippocampal volume and neurotrophic factors (e.g., BDNF). Prospective cohorts suggest reduced risk of dementia among physically active individuals, controlling for education and baseline health.",
+        "[13] Workplace and community-based exercise programs can reduce musculoskeletal pain, especially low back and neck pain. Strengthening and mobility protocols tailored to occupational demands show modest but meaningful improvements in function and presenteeism. Adherence and proper progression are key to sustained benefit.",
+        "[14] High-intensity interval training (HIIT) efficiently improves VO2max and insulin sensitivity. Shorter sessions with appropriate recovery can deliver cardiometabolic benefits comparable to longer moderate-intensity workouts, when supervised and progressed safely. HIIT may not suit all populations without medical screening.",
+        "[15] Progressive resistance training increases lean mass and improves resting metabolic rate, supporting better weight management. It also enhances glucose uptake via GLUT4 expression and improves bone loading. Programs should individualize load, volume, and frequency for safety and adherence.",
+        "[16] Breaking up prolonged sitting with brief activity bouts can improve postprandial glucose and lipid responses, independent of formal exercise sessions. These “sedentary breaks” offer an accessible strategy alongside planned workouts to improve cardiometabolic risk profiles.",
+        "[17] Outdoor physical activity can combine light-to-moderate exercise with sun exposure, potentially improving vitamin D status while supporting mood. Although indirect, these factors may complement structured exercise for overall well-being.",
+        "[18] Team-based sports provide social connection and motivation that can enhance adherence to exercise routines. While the social benefits are indirect, improved consistency contributes to realized health outcomes over time.",
+        "[19] Balance and proprioceptive training reduce falls in older adults and improve gait stability. Programs incorporating tai chi, single-leg stance, and dynamic balance challenges can decrease fall risk and related injuries when practiced regularly.",
+        "[20] Watching fitness influencers online without engaging in actual physical activity does not confer physiological benefits. Passive consumption of fitness content is not a substitute for regular exercise and yields no direct cardiometabolic improvements.",
     ]
     return query, documents
 
@@ -42,15 +51,15 @@ def build_chat_messages(query: str, documents: list[str]):
     system_message = (
         "You are an intelligent assistant that ranks passages based on relevance to search queries. "
         "Follow the exact format with <think>/<answer>. "
-        "Use ONLY the <think> and <answer> tags; do NOT use any other tags (e.g., <tool_call>)."
     )
 
     # 用户消息先给出query和passages，再给出指令（确保模型知道上下文后再按指令推理）
+    n = len(documents)
     user_message = (
         f"Query: \"{query}\"\n\n"
         f"Passages:\n{doc_text}\n\n"
         f"{instruction}\n\n"
-        f"Before writing <answer>, check completeness: if there are 10 passages [1]..[10], the answer must contain all [1]..[10] exactly once.\n"
+        f"There are {n} passages with identifiers [1]..[{n}]. In <answer>, you MUST include ALL of them exactly once (no omissions, no duplicates).\n"
         f"Now please produce the final ranking."
     )
 
@@ -62,7 +71,7 @@ def build_chat_messages(query: str, documents: list[str]):
 
 
 def load_qwen_model():
-    model_name = "Qwen/Qwen3-4B-Instruct-2507"
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
     print(f"Loading model: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -131,63 +140,49 @@ def analyze_response(response: str, query: str, documents: list[str]):
                     print(f"  {i}. {documents[idx]}")
 
 
-def build_fake_item_for_reward(query: str, documents: list[str], qid: str = "Q1") -> dict:
-    # 构造一个与NDCG计算兼容的最小item结构（必须包含 qid 和 docid）
-    hits = []
-    for i in range(1, len(documents) + 1):
-        hits.append({
-            'qid': qid,
-            'docid': f'D{i}',
-            'rank': i,
-            'score': float(len(documents) - i)  # 任意分数，占位
-        })
-    item = {
-        'query': query,
-        'hits': hits,
-        'metrics': {'NDCG@10': 0.0},
-        'best_metrics': {'NDCG@10': 1.0},
-    }
-    return item
-
-
-def print_reward_summary(reward: dict):
-    print("\n" + "-"*80)
-    print("Reward 评估结果")
-    print("-"*80)
-    # 关键指标
-    keys_of_interest = [
-        'score', 'ndcg_reward', 'answer_consistency', 'answer_format', 'format_cover',
-        'duplicate_pairs', 'contradiction_pairs', 'has_cycle',
-        'satisfied_constraints', 'total_constraints', 'invalid_compare_lines',
-        'num_valid_comparisons', 'num_compare_lines'
-    ]
-    for k in keys_of_interest:
-        if k in reward:
-            print(f"{k}: {reward[k]}")
-    # 其余信息简要打印
-    extra = {k: v for k, v in reward.items() if k not in keys_of_interest}
-    if extra:
-        print("\n(更多明细)")
-        print(json.dumps(extra, ensure_ascii=False, indent=2))
-
-
-def build_gold_qrels() -> tuple[dict, list[int]]:
-    """构造单-query 的理想相关性，用于NDCG。
-    返回 qrels_dict 以及理想顺序（按文档编号）。
-    约定 docid = D{i} 与文档 [i] 对应。
-    评分策略：
-      - Top3: 3 分；Next3: 2 分；Next2: 1 分；Last2: 0 分。
+def extract_answer_text_robust(response_text: str) -> str:
+    """Robustly extract answer content for reward usage.
+    - Prefer <answer>...</answer> (case-insensitive)
+    - Else, find the longest chain like [i] > [j] > ... (at least 3 items)
+    - Fallback to empty string
     """
-    gold_order = [1, 3, 5, 6, 2, 9, 7, 8, 4, 10]
-    grades = [3, 3, 3, 2, 2, 2, 1, 1, 0, 0]
-    qrels = {"Q1": {}}
-    for i, rel in zip(gold_order, grades):
-        qrels["Q1"][f"D{i}"] = rel
-    return qrels, gold_order
+    m = re.search(r"<\s*answer\s*>(.*?)<\s*/\s*answer\s*>", response_text, re.DOTALL | re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    chain_pattern = r"(?:\[\d+\]\s*(?:>\s*\[\d+\]\s*){2,})"
+    chains = re.findall(chain_pattern, response_text, flags=re.DOTALL)
+    if chains:
+        def id_count(s: str) -> int: return len(re.findall(r"\[\d+\]", s))
+        max_count = max(id_count(s) for s in chains)
+        candidates = [s for s in chains if id_count(s) == max_count]
+        return candidates[-1].strip()
+    return ""
+
+
+def normalize_answer_chain(answer_text: str, n: int) -> tuple[list[int], str]:
+    """Dedup keep-first, filter out-of-range, append missing ascending; return indices and chain string."""
+    ids = [int(x) for x in re.findall(r"\[(\d+)\]", answer_text)]
+    ids = [i for i in ids if 1 <= i <= n]
+    seen, dedup = set(), []
+    for i in ids:
+        if i not in seen:
+            dedup.append(i); seen.add(i)
+    missing = [i for i in range(1, n+1) if i not in seen]
+    order = dedup + missing
+    chain = " > ".join([f"[{i}]" for i in order])
+    return order[:n], chain
+
+
+
+
+
+
+
+
 
 
 def main():
-    print("=== Qwen2.5-7B 灵活排序 Prompt 测试（10文档+NDCG） ===\n")
+    print("=== Qwen2.5-7B 灵活排序 Prompt 测试（20文档+NDCG） ===\n")
     # 1) 准备数据
     query, documents = create_test_data()
     print(f"Query: {query}")
@@ -195,9 +190,7 @@ def main():
     for d in documents:
         print("  " + d)
 
-    # 打印理想顺序
-    qrels_dict, gold_order = build_gold_qrels()
-    print("\nGold ranking (by doc index):", " > ".join([f"[{i}]" for i in gold_order]))
+    # 本测试仅输出从 <answer> 提取并清洗后的排序
 
     # 2) 构建消息（使用与produce_data相同的指令文本）
     messages = build_chat_messages(query, documents)
@@ -206,22 +199,20 @@ def main():
     try:
         model, tokenizer = load_qwen_model()
         response = generate_response(model, tokenizer, messages)
+        print(response)
+        print("\n\n\n")
     except Exception as e:
         print(f"❌ 运行失败: {e}")
         print("请确保已安装 transformers、torch，并有足够内存/GPU。")
         return
 
-    # 4) 简单分析输出
-    analyze_response(response, query, documents)
+    # 4) 仅提取并输出排序
 
-    # 5) 构造item并计算reward
-    item = build_fake_item_for_reward(query, documents, qid="Q1")
-    try:
-        reward = cr_reward.compute_score(response, item, qrels_dict=qrels_dict)
-    except Exception as e:
-        print(f"❌ 计算reward失败: {e}")
-        return
-    print_reward_summary(reward)
+    # 5) 规范化 answer 并构造 item，然后计算 reward
+    #    compare_rounds_reward 要求 answer 长度与重复严格（ANSWER_EXPECTED_N=20），因此先尽力规范化链路
+    extracted = extract_answer_text_robust(response)
+    order, chain = normalize_answer_chain(extracted, n=len(documents))
+    print("\nExtracted ranking:", chain)
 
     print("\n" + "="*80)
     print("测试完成！")
